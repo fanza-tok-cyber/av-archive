@@ -79,16 +79,7 @@
   #actress-input::placeholder { color: var(--muted); }
 
   #setup-btn {
-    background: transparent;
-    border: 1px solid var(--accent);
-    color: var(--accent);
-    padding: 6px 12px;
-    border-radius: 2px;
-    font-size: 11px;
-    cursor: pointer;
-    font-weight: 700;
-    white-space: nowrap;
-    letter-spacing: 1px;
+    display: none;
   }
 
   /* ─── ジャンルフィルター ─── */
@@ -227,9 +218,11 @@
   #feed {
     height: calc(100dvh - 106px);
     overflow-y: scroll;
+    overflow-x: hidden;
     scroll-snap-type: y mandatory;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    overscroll-behavior-y: contain;
   }
   #feed::-webkit-scrollbar { display: none; }
 
@@ -238,7 +231,7 @@
     scroll-snap-align: start;
     position: relative;
     background: #050303;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .tiktok-item img.main-img {
@@ -386,26 +379,73 @@
   }
   .price-tag.free { color: white; border-color: white; }
 
-  /* サンプル画像横スクロール */
-  .sample-scroll {
+  /* ─── スワイパー（TikTok風） ─── */
+  .swiper {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    overflow-x: scroll;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    touch-action: pan-x;
+  }
+  .swiper::-webkit-scrollbar { display: none; }
+
+  .swiper-slide {
+    flex: 0 0 100%;
+    width: 100%;
+    height: 100%;
+    scroll-snap-align: start;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .swiper-slide img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .swiper-dots {
+    position: absolute;
+    bottom: 46%;
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
     gap: 5px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    margin-bottom: 12px;
+    z-index: 20;
+    pointer-events: none;
   }
-  .sample-scroll::-webkit-scrollbar { display: none; }
 
-  .sample-thumb {
-    flex: 0 0 72px;
-    height: 100px;
-    object-fit: cover;
-    border-radius: 1px;
-    border: 1px solid rgba(192,57,43,0.4);
-    cursor: pointer;
-    transition: border-color 0.2s;
+  .swiper-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.4);
+    transition: all 0.25s;
   }
-  .sample-thumb:active { border-color: var(--accent2); }
+  .swiper-dot.active {
+    background: white;
+    width: 18px;
+    border-radius: 3px;
+  }
+
+  .swiper-count {
+    position: absolute;
+    top: 20px;
+    right: 16px;
+    background: rgba(0,0,0,0.6);
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    z-index: 20;
+    letter-spacing: 1px;
+  }
 
   /* アフィリエイトボタン */
   .affiliate-btn {
@@ -700,10 +740,28 @@ function renderFeed(items) {
     el.className = 'tiktok-item';
     el.dataset.index = idx;
 
+    // 表紙＋サンプル画像を結合
+    const allImgs = [item.thumb, ...(item.samples || [])].filter(Boolean);
+    const total   = allImgs.length;
+
     el.innerHTML = `
-      <img class="main-img" src="${esc(item.thumb)}" alt="" loading="lazy"
-           onerror="this.src='https://placehold.co/720x1280/050303/2a1010?text=No+Image'">
+      <!-- スワイパー -->
+      <div class="swiper" id="swiper-${idx}">
+        ${allImgs.map((src, si) => `
+          <div class="swiper-slide">
+            <img src="${esc(src)}" alt=""
+                 loading="${si===0?'eager':'lazy'}"
+                 onerror="this.src='https://placehold.co/720x1280/050303/2a1010?text=No+Image'">
+          </div>`).join('')}
+      </div>
+
       <div class="overlay"></div>
+
+      ${total > 1 ? `<div class="swiper-count" id="count-${idx}">1 / ${total}</div>` : ''}
+      ${total > 1 ? `
+      <div class="swiper-dots" id="dots-${idx}">
+        ${allImgs.map((_,si) => `<div class="swiper-dot${si===0?' active':''}"></div>`).join('')}
+      </div>` : ''}
 
       <div class="badges">
         ${item.isNew ? '<span class="badge badge-new">NEW</span>' : ''}
@@ -730,14 +788,6 @@ function renderFeed(items) {
           <span class="genre-tag">#${esc(item.genre)}</span>
           <span class="price-tag ${isFree?'free':''}">${priceStr}</span>
         </div>
-        ${item.samples && item.samples.length > 0 ? `
-        <div class="sample-scroll">
-          ${item.samples.map(src => `
-            <img class="sample-thumb" src="${esc(src)}" alt=""
-                 onclick="openViewer('${esc(src)}'); event.stopPropagation();"
-                 loading="lazy" onerror="this.style.display='none'">
-          `).join('')}
-        </div>` : ''}
         <a class="affiliate-btn ${hasLink?'':'no-id'}"
            href="${esc(item.affiliateUrl)}" target="_blank" rel="noopener noreferrer">
           ${hasLink ? '🎬 FANZAで今すぐ視聴する →' : '⚙ 設定からAPIを接続してください'}
@@ -778,6 +828,21 @@ function observeItems() {
     });
   }, { threshold: 0.6 });
   document.querySelectorAll('.tiktok-item').forEach(el => observer.observe(el));
+
+  // スワイパー初期化
+  document.querySelectorAll('.swiper').forEach(swiper => {
+    const idx    = swiper.id.replace('swiper-', '');
+    const dots   = document.getElementById(`dots-${idx}`);
+    const count  = document.getElementById(`count-${idx}`);
+    const dotEls = dots ? dots.querySelectorAll('.swiper-dot') : [];
+    const total  = dotEls.length;
+    if (total === 0) return;
+    swiper.addEventListener('scroll', () => {
+      const i = Math.round(swiper.scrollLeft / swiper.offsetWidth);
+      dotEls.forEach((d, di) => d.classList.toggle('active', di === i));
+      if (count) count.textContent = `${i+1} / ${total}`;
+    }, { passive: true });
+  });
 }
 
 // ═══════════════════════════════════════════
@@ -831,7 +896,7 @@ function filterItems() {
     (!text || item.title.toLowerCase().includes(text) ||
               item.actress.toLowerCase().includes(text) ||
               item.maker.toLowerCase().includes(text)) &&
-    (genre==='all' || item.genre===genre)
+    (genre==='all' || (item.genre && item.genre.includes(genre)))
   ));
 }
 
