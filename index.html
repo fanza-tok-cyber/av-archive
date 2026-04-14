@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FANZAアーカイブ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --accent:  #c0392b;
+    --accent2: #e74c3c;
+    --crimson: #8b1a1a;
+    --glow:    rgba(192,57,43,0.5);
+    --bg:      #080808;
+    --surface: #100808;
+    --border:  #2a1010;
+    --text:    #f0e8e8;
+    --muted:   #8a6060;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Zen Kaku Gothic New', system-ui, sans-serif;
+    font-weight: 300;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  /* ─── ヘッダー ─── */
+  header {
+    padding: 10px 16px;
+    background: #050303;
+    border-bottom: 1px solid var(--accent);
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  header::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent2), transparent);
+  }
+
+  h1 {
+    font-size: 18px;
+    font-weight: 700;
+    background: linear-gradient(90deg, #fff, var(--accent2), var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 3px;
+    white-space: nowrap;
+  }
+
+  /* 女優検索 */
+  #actress-input {
+    flex: 1;
+    padding: 7px 14px;
+    background: #100808;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    min-width: 0;
+  }
+  #actress-input:focus { border-color: var(--accent); }
+  #actress-input::placeholder { color: var(--muted); }
+
+  #setup-btn {
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 6px 12px;
+    border-radius: 2px;
+    font-size: 11px;
+    cursor: pointer;
+    font-weight: 700;
+    white-space: nowrap;
+    letter-spacing: 1px;
+  }
+
+  /* ─── ジャンルフィルター ─── */
+  .controls {
+    padding: 8px 16px;
+    background: rgba(5,3,3,0.98);
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    white-space: nowrap;
+    z-index: 10;
+    scrollbar-width: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .controls::-webkit-scrollbar { display: none; }
+
+  .filter-btn {
+    padding: 6px 14px;
+    background: #100808;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+  }
+  .filter-btn.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+    font-weight: 700;
+    box-shadow: 0 0 10px var(--glow);
+  }
+
+  /* ─── セットアップモーダル ─── */
+  #setup-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  #setup-modal.open { display: flex; }
+
+  .modal-box {
+    background: #0d0505;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    padding: 28px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 0 40px var(--glow);
+  }
+
+  .modal-box h2 {
+    font-size: 13px;
+    letter-spacing: 4px;
+    color: var(--accent2);
+    margin-bottom: 20px;
+    text-transform: uppercase;
+  }
+
+  .modal-box label {
+    display: block;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    margin-top: 14px;
+  }
+
+  .modal-box input {
+    width: 100%;
+    background: #080303;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 12px 16px;
+    border-radius: 2px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+  }
+  .modal-box input:focus { border-color: var(--accent); }
+
+  .modal-hint {
+    font-size: 11px;
+    color: #4a2a2a;
+    line-height: 1.9;
+    margin: 16px 0 0;
+  }
+  .modal-hint a { color: var(--accent); text-decoration: none; }
+
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+
+  .btn-save {
+    flex: 1;
+    padding: 14px;
+    background: linear-gradient(135deg, var(--crimson), var(--accent));
+    border: none;
+    color: white;
+    border-radius: 2px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 2px;
+    box-shadow: 0 4px 20px var(--glow);
+  }
+  .btn-demo {
+    flex: 1;
+    padding: 14px;
+    background: #1a0808;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 2px;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .btn-cancel {
+    padding: 14px 18px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: #4a2a2a;
+    border-radius: 2px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  /* ─── TikTokフィード ─── */
+  #feed {
+    height: calc(100dvh - 106px);
+    overflow-y: scroll;
+    scroll-snap-type: y mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  #feed::-webkit-scrollbar { display: none; }
+
+  .tiktok-item {
+    height: 100%;
+    scroll-snap-align: start;
+    position: relative;
+    background: #050303;
+    overflow: hidden;
+  }
+
+  .tiktok-item img.main-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.6s ease;
+  }
+  .tiktok-item.in-view img.main-img { transform: scale(1.04); }
+
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to top,
+      rgba(5,0,0,0.97) 0%,
+      rgba(5,0,0,0.6) 35%,
+      rgba(0,0,0,0.1) 75%,
+      transparent 100%
+    );
+    z-index: 1;
+  }
+
+  /* グロー効果 */
+  .overlay::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 100%, rgba(192,57,43,0.12) 0%, transparent 70%);
+  }
+
+  /* バッジ */
+  .badges {
+    position: absolute;
+    top: 20px;
+    left: 16px;
+    display: flex;
+    gap: 6px;
+    z-index: 5;
+  }
+  .badge {
+    padding: 4px 12px;
+    border-radius: 1px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .badge-new  { background: var(--accent); color: white; box-shadow: 0 0 10px var(--glow); }
+  .badge-rank { background: transparent; border: 1px solid var(--accent2); color: var(--accent2); }
+
+  /* サイドアクション */
+  .side-actions {
+    position: absolute;
+    right: 14px;
+    bottom: 220px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    z-index: 10;
+  }
+
+  .action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    color: white;
+    cursor: pointer;
+    transition: transform 0.15s;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.9);
+    user-select: none;
+  }
+  .action-btn:active { transform: scale(1.3); }
+  .action-btn .icon  { font-size: 30px; line-height: 1; filter: drop-shadow(0 0 4px var(--glow)); }
+  .action-btn .lbl   { font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+
+  /* 情報エリア */
+  .info {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 76px;
+    padding: 20px 16px 24px;
+    z-index: 5;
+  }
+
+  .maker-name {
+    color: var(--accent2);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+  }
+
+  /* 女優名 */
+  .actress-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 4px;
+    letter-spacing: 1px;
+    text-shadow: 0 0 20px var(--glow);
+  }
+
+  .title {
+    font-size: 14px;
+    line-height: 1.45;
+    font-weight: 300;
+    margin-bottom: 10px;
+    color: rgba(240,232,232,0.85);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .genre-tag {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  .price-tag {
+    background: rgba(5,0,0,0.8);
+    border: 1px solid var(--accent);
+    padding: 3px 14px;
+    border-radius: 1px;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--accent2);
+    letter-spacing: 1px;
+  }
+  .price-tag.free { color: white; border-color: white; }
+
+  /* サンプル画像横スクロール */
+  .sample-scroll {
+    display: flex;
+    gap: 5px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin-bottom: 12px;
+  }
+  .sample-scroll::-webkit-scrollbar { display: none; }
+
+  .sample-thumb {
+    flex: 0 0 72px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 1px;
+    border: 1px solid rgba(192,57,43,0.4);
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .sample-thumb:active { border-color: var(--accent2); }
+
+  /* アフィリエイトボタン */
+  .affiliate-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: linear-gradient(135deg, var(--crimson) 0%, var(--accent) 100%);
+    color: white;
+    text-decoration: none;
+    padding: 13px 20px;
+    border-radius: 2px;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 2px;
+    box-shadow: 0 4px 20px var(--glow);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .affiliate-btn:active { transform: scale(0.96); }
+  .affiliate-btn.no-id  { background: #1a0808; box-shadow: none; color: var(--muted); font-size: 12px; border: 1px solid var(--border); }
+
+  /* ローディング */
+  #loading {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(5,3,3,0.94);
+    z-index: 50;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+  }
+  #loading.show { display: flex; }
+  .spinner {
+    width: 40px; height: 40px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    box-shadow: 0 0 16px var(--glow);
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 12px; color: var(--muted); letter-spacing: 3px; }
+
+  /* 進捗ドット */
+  #progress-dots {
+    position: fixed;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 20;
+  }
+  .dot { width: 3px; height: 3px; border-radius: 50%; background: rgba(192,57,43,0.3); transition: all 0.3s; }
+  .dot.active { background: var(--accent); height: 14px; border-radius: 1px; box-shadow: 0 0 6px var(--glow); }
+
+  /* 画像ビューア */
+  #img-viewer {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.96);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  #img-viewer.open { display: flex; }
+  #img-viewer img { max-width: 95vw; max-height: 90vh; object-fit: contain; border: 1px solid var(--accent); }
+  #img-viewer-close { position: absolute; top: 16px; right: 20px; color: var(--accent2); font-size: 28px; cursor: pointer; }
+
+  .empty {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: 2px;
+  }
+  .empty span { font-size: 36px; }
+</style>
+</head>
+<body>
+
+<!-- ヘッダー -->
+<header>
+  <h1>AV</h1>
+  <input type="text" id="actress-input" placeholder="女優名で検索...">
+  <button id="setup-btn" onclick="openSetup()">⚙ 設定</button>
+</header>
+
+<!-- ジャンルフィルター -->
+<div class="controls">
+  <button class="filter-btn active" data-genre="all">すべて</button>
+  <button class="filter-btn" data-genre="素人">素人</button>
+  <button class="filter-btn" data-genre="人妻">人妻</button>
+  <button class="filter-btn" data-genre="熟女">熟女</button>
+  <button class="filter-btn" data-genre="巨乳">巨乳</button>
+  <button class="filter-btn" data-genre="ロリ系">ロリ系</button>
+  <button class="filter-btn" data-genre="ギャル">ギャル</button>
+  <button class="filter-btn" data-genre="メイド">メイド</button>
+  <button class="filter-btn" data-genre="OL">OL</button>
+  <button class="filter-btn" data-genre="NTR">NTR</button>
+  <button class="filter-btn" data-genre="中出し">中出し</button>
+  <button class="filter-btn" data-genre="3P">3P</button>
+  <button class="filter-btn" data-genre="アナル">アナル</button>
+</div>
+
+<!-- セットアップモーダル -->
+<div id="setup-modal">
+  <div class="modal-box">
+    <h2>⚙ FANZA API 設定</h2>
+
+    <label>① GAS プロキシURL</label>
+    <input type="url" id="input-proxy-url"
+           placeholder="https://script.google.com/macros/s/xxxxx/exec">
+
+    <label>② アフィリエイトID</label>
+    <input type="text" id="input-affiliate-id" placeholder="例: yourname-001">
+
+    <div class="modal-hint">
+      同人サイトと同じGAS URLとアフィリエイトIDでOKです。<br>
+      GASのCONFIGの <strong>floor</strong> を <strong>videoa</strong> に変更してください。
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeSetup()">✕</button>
+      <button class="btn-demo" onclick="loadDemo();closeSetup();">デモ表示</button>
+      <button class="btn-save" onclick="saveAndFetch()">▶ API接続</button>
+    </div>
+  </div>
+</div>
+
+<!-- ローディング -->
+<div id="loading">
+  <div class="spinner"></div>
+  <div class="loading-text">動画を取得中...</div>
+</div>
+
+<div id="feed"></div>
+<div id="progress-dots"></div>
+
+<!-- 画像ビューア -->
+<div id="img-viewer" onclick="closeViewer()">
+  <span id="img-viewer-close">✕</span>
+  <img id="img-viewer-img" src="" alt="">
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// 設定
+// ═══════════════════════════════════════════
+let proxyUrl    = localStorage.getItem('fanza_av_proxy_url')    || 'https://script.google.com/macros/s/AKfycbxx-r7ZoRO0YxS-v0FAlroe4BR6M-Fn6jWqxKfBk0WAA9sdRkRTYviDhwT9Vn59vQ_N/exec';
+let affiliateId = localStorage.getItem('fanza_av_affiliate_id') || 'gotomask-990';
+
+let allItems = [], currentItems = [];
+
+// ─── モーダル ───
+function openSetup() {
+  document.getElementById('input-proxy-url').value    = proxyUrl;
+  document.getElementById('input-affiliate-id').value = affiliateId;
+  document.getElementById('setup-modal').classList.add('open');
+}
+function closeSetup() {
+  document.getElementById('setup-modal').classList.remove('open');
+}
+document.getElementById('setup-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('setup-modal')) closeSetup();
+});
+
+async function saveAndFetch() {
+  proxyUrl    = document.getElementById('input-proxy-url').value.trim();
+  affiliateId = document.getElementById('input-affiliate-id').value.trim();
+  localStorage.setItem('fanza_av_proxy_url',    proxyUrl);
+  localStorage.setItem('fanza_av_affiliate_id', affiliateId);
+  closeSetup();
+  if (!proxyUrl) { showToast('⚠ GAS URLを入力してください'); return; }
+  await fetchFromGAS();
+}
+
+// ═══════════════════════════════════════════
+// FANZA API（GAS経由）
+// AV用: service=digital, floor=videoa
+// ═══════════════════════════════════════════
+async function fetchFromGAS(params = {}) {
+  showLoading(true);
+  const q = new URLSearchParams({
+    hits:    params.hits    || '20',
+    sort:    params.sort    || 'rank',
+    keyword: params.keyword || '',
+    floor:   'videoa',   // ← AV用
+    service: 'digital',
+  });
+  [...q.entries()].forEach(([k,v]) => { if (!v) q.delete(k); });
+
+  try {
+    const res  = await fetch(`${proxyUrl}?${q.toString()}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    if (json.error) throw new Error(json.error);
+
+    const items = json?.result?.items ?? [];
+    if (!items.length) { showToast('作品が見つかりませんでした'); return; }
+
+    allItems = items.map(item => ({
+      id:           item.content_id,
+      title:        item.title,
+      maker:        item.iteminfo?.maker?.[0]?.name ?? '',
+      actress:      item.iteminfo?.actress?.map(a => a.name).join('・') ?? '',
+      thumb:        item.imageURL?.large ?? item.imageURL?.list ?? '',
+      samples:      item.sampleImageURL?.sample_s?.image ?? [],
+      affiliateUrl: item.affiliateURL,
+      price:        parseInt(item.prices?.price ?? '0'),
+      genre:        item.iteminfo?.genre?.[0]?.name ?? '',
+      isNew:        withinDays(item.date, 7),
+      rank:         item.rank ?? null,
+      likes:        item.review?.count ?? Math.floor(Math.random()*3000),
+    }));
+
+    currentItems = allItems;
+    renderFeed(allItems);
+    showToast(`✅ ${allItems.length}件取得しました`);
+  } catch(err) {
+    showToast(`❌ 取得失敗: ${err.message}`);
+    console.error(err);
+  } finally {
+    showLoading(false);
+  }
+}
+
+function withinDays(dateStr, days) {
+  if (!dateStr) return false;
+  return Date.now() - new Date(dateStr).getTime() < days * 86400000;
+}
+
+// ═══════════════════════════════════════════
+// デモデータ
+// ═══════════════════════════════════════════
+function loadDemo() {
+  const genres   = ['素人','人妻','熟女','巨乳','ギャル','OL','メイド','NTR','中出し','3P'];
+  const makers   = ['MOODYZ','S1','Madonna','PRESTIGE','WANZ FACTORY','Attackers'];
+  const actresses = ['架空 花子','仮想 美咲','デモ 桜','サンプル 愛','テスト 結衣','例示 麻衣'];
+
+  allItems = Array.from({length: 20}, (_,i) => {
+    const base = 'https://www.dmm.co.jp/digital/videoa/';
+    const affUrl = affiliateId
+      ? `https://al.dmm.co.jp/?lurl=${encodeURIComponent(base)}&af_id=${encodeURIComponent(affiliateId)}&ch=api`
+      : base;
+    return {
+      id:           i,
+      title:        `【${genres[i%genres.length]}】デモ作品タイトル Vol.${i+1}`,
+      maker:        makers[i%makers.length],
+      actress:      actresses[i%actresses.length],
+      thumb:        `https://picsum.photos/id/${320+i}/720/1280`,
+      samples:      Array.from({length:5},(_,s)=>`https://picsum.photos/id/${400+i*5+s}/400/560`),
+      affiliateUrl: affUrl,
+      price:        i%6===0 ? 0 : 2178+(i%8)*220,
+      genre:        genres[i%genres.length],
+      isNew:        i<4,
+      rank:         i<3 ? i+1 : null,
+      likes:        2400+i*180,
+    };
+  });
+  currentItems = allItems;
+  renderFeed(allItems);
+}
+
+// ═══════════════════════════════════════════
+// 描画
+// ═══════════════════════════════════════════
+function renderFeed(items) {
+  currentItems = items;
+  const feed = document.getElementById('feed');
+  feed.innerHTML = '';
+
+  if (!items.length) {
+    feed.innerHTML = '<div class="empty"><span>🔍</span>該当作品がありません</div>';
+    renderDots(0,0); return;
+  }
+
+  items.forEach((item, idx) => {
+    const isFree   = item.price === 0;
+    const priceStr = isFree ? '無料' : `¥${item.price.toLocaleString()}`;
+    const hasLink  = !!(affiliateId || proxyUrl);
+
+    const el = document.createElement('div');
+    el.className = 'tiktok-item';
+    el.dataset.index = idx;
+
+    el.innerHTML = `
+      <img class="main-img" src="${esc(item.thumb)}" alt="" loading="lazy"
+           onerror="this.src='https://placehold.co/720x1280/050303/2a1010?text=No+Image'">
+      <div class="overlay"></div>
+
+      <div class="badges">
+        ${item.isNew ? '<span class="badge badge-new">NEW</span>' : ''}
+        ${item.rank  ? `<span class="badge badge-rank">#${item.rank}</span>` : ''}
+      </div>
+
+      <div class="side-actions">
+        <div class="action-btn" onclick="handleLike(this)">
+          <div class="icon">❤️</div><div class="lbl">${fmtNum(item.likes)}</div>
+        </div>
+        <div class="action-btn" onclick="handleBookmark(this)">
+          <div class="icon">🔖</div><div class="lbl">保存</div>
+        </div>
+        <div class="action-btn" onclick="handleShare('${esc(item.affiliateUrl)}')">
+          <div class="icon">↗️</div><div class="lbl">シェア</div>
+        </div>
+      </div>
+
+      <div class="info">
+        <div class="maker-name">${esc(item.maker)}</div>
+        ${item.actress ? `<div class="actress-name">👤 ${esc(item.actress)}</div>` : ''}
+        <div class="title">${esc(item.title)}</div>
+        <div class="meta">
+          <span class="genre-tag">#${esc(item.genre)}</span>
+          <span class="price-tag ${isFree?'free':''}">${priceStr}</span>
+        </div>
+        ${item.samples && item.samples.length > 0 ? `
+        <div class="sample-scroll">
+          ${item.samples.map(src => `
+            <img class="sample-thumb" src="${esc(src)}" alt=""
+                 onclick="openViewer('${esc(src)}'); event.stopPropagation();"
+                 loading="lazy" onerror="this.style.display='none'">
+          `).join('')}
+        </div>` : ''}
+        <a class="affiliate-btn ${hasLink?'':'no-id'}"
+           href="${esc(item.affiliateUrl)}" target="_blank" rel="noopener noreferrer">
+          ${hasLink ? '🎬 FANZAで今すぐ視聴する →' : '⚙ 設定からAPIを接続してください'}
+        </a>
+      </div>`;
+
+    feed.appendChild(el);
+  });
+
+  renderDots(items.length, 0);
+  observeItems();
+}
+
+function renderDots(total, active) {
+  const c = document.getElementById('progress-dots');
+  c.innerHTML = '';
+  const n = Math.min(total, 20);
+  for (let i = 0; i < n; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i===active?' active':'');
+    c.appendChild(d);
+  }
+}
+
+function updateDot(index) {
+  const dots = document.querySelectorAll('.dot');
+  const di = Math.round(index / Math.max(currentItems.length-1,1) * (dots.length-1));
+  dots.forEach((d,i) => d.classList.toggle('active', i===di));
+}
+
+let observer;
+function observeItems() {
+  if (observer) observer.disconnect();
+  observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      e.target.classList.toggle('in-view', e.isIntersecting);
+      if (e.isIntersecting) updateDot(parseInt(e.target.dataset.index));
+    });
+  }, { threshold: 0.6 });
+  document.querySelectorAll('.tiktok-item').forEach(el => observer.observe(el));
+}
+
+// ═══════════════════════════════════════════
+// アクション
+// ═══════════════════════════════════════════
+function handleLike(el) {
+  const lbl = el.querySelector('.lbl'), icon = el.querySelector('.icon');
+  lbl.textContent = fmtNum(parseNum(lbl.textContent) + Math.floor(Math.random()*50)+10);
+  icon.textContent = '💖';
+  el.style.transform = 'scale(1.4)';
+  setTimeout(() => { el.style.transform=''; icon.textContent='❤️'; }, 300);
+}
+
+function handleBookmark(el) {
+  const icon=el.querySelector('.icon'), lbl=el.querySelector('.lbl');
+  icon.textContent='✅'; lbl.textContent='保存済';
+  setTimeout(() => { icon.textContent='🔖'; lbl.textContent='保存'; }, 1800);
+}
+
+function handleShare(url) {
+  if (navigator.share) { navigator.share({ title:'FANZAアーカイブ', url }); }
+  else if (navigator.clipboard) { navigator.clipboard.writeText(url); showToast('📋 リンクをコピーしました！'); }
+  else { prompt('URLをコピーしてください:', url); }
+}
+
+function openViewer(src) {
+  document.getElementById('img-viewer-img').src = src;
+  document.getElementById('img-viewer').classList.add('open');
+}
+function closeViewer() {
+  document.getElementById('img-viewer').classList.remove('open');
+  document.getElementById('img-viewer-img').src = '';
+}
+
+// ═══════════════════════════════════════════
+// フィルター（女優名 + ジャンル）
+// ═══════════════════════════════════════════
+document.getElementById('actress-input').addEventListener('input', filterItems);
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    filterItems();
+  });
+});
+
+function filterItems() {
+  const text  = document.getElementById('actress-input').value.toLowerCase().trim();
+  const genre = document.querySelector('.filter-btn.active').dataset.genre;
+  renderFeed(allItems.filter(item =>
+    (!text || item.title.toLowerCase().includes(text) ||
+              item.actress.toLowerCase().includes(text) ||
+              item.maker.toLowerCase().includes(text)) &&
+    (genre==='all' || item.genre===genre)
+  ));
+}
+
+// ═══════════════════════════════════════════
+// ユーティリティ
+// ═══════════════════════════════════════════
+function showLoading(f) { document.getElementById('loading').classList.toggle('show',f); }
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.textContent = msg;
+  Object.assign(t.style, {
+    position:'fixed', bottom:'80px', left:'50%', transform:'translateX(-50%)',
+    background:'rgba(192,57,43,0.92)', color:'white',
+    padding:'10px 22px', borderRadius:'2px',
+    fontSize:'13px', fontWeight:'700', zIndex:'200',
+    pointerEvents:'none', whiteSpace:'nowrap', transition:'opacity 0.4s',
+    letterSpacing:'1px',
+  });
+  document.body.appendChild(t);
+  setTimeout(() => t.style.opacity='0', 1800);
+  setTimeout(() => t.remove(), 2200);
+}
+
+function esc(s) {
+  return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtNum(n) {
+  n=parseInt(n)||0;
+  if(n>=10000) return (n/10000).toFixed(1)+'万';
+  if(n>=1000)  return (n/1000).toFixed(1)+'K';
+  return String(n);
+}
+function parseNum(s) {
+  s=String(s);
+  if(s.includes('万')) return Math.round(parseFloat(s)*10000);
+  if(s.includes('K'))  return Math.round(parseFloat(s)*1000);
+  return parseInt(s)||0;
+}
+
+// ─── 起動 ───
+window.addEventListener('load', () => {
+  if (proxyUrl) fetchFromGAS();
+  else { loadDemo(); setTimeout(openSetup, 900); }
+});
+</script>
+</body>
+</html>
