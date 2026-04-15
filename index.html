@@ -78,8 +78,19 @@
   #actress-input:focus { border-color: var(--accent); }
   #actress-input::placeholder { color: var(--muted); }
 
-  #setup-btn {
-    display: none;
+  #setup-btn { display: none; }
+
+  #sort-select {
+    background: #100808;
+    border: 1px solid var(--accent);
+    color: var(--accent2);
+    padding: 6px 10px;
+    border-radius: 2px;
+    font-size: 12px;
+    font-family: inherit;
+    outline: none;
+    cursor: pointer;
+    white-space: nowrap;
   }
 
   /* ─── ジャンルフィルター ─── */
@@ -231,18 +242,8 @@
     scroll-snap-align: start;
     position: relative;
     background: #050303;
-    overflow: visible;
+    overflow: hidden;  /* hiddenに戻す */
   }
-
-  .tiktok-item img.main-img {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 0.6s ease;
-  }
-  .tiktok-item.in-view img.main-img { transform: scale(1.04); }
 
   .overlay {
     position: absolute;
@@ -389,7 +390,8 @@
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    touch-action: pan-x;
+    /* タッチ操作：縦スクロールと横スワイプを両立 */
+    touch-action: pan-y pinch-zoom;
   }
   .swiper::-webkit-scrollbar { display: none; }
 
@@ -400,22 +402,26 @@
     scroll-snap-align: start;
     position: relative;
     overflow: hidden;
+    flex-shrink: 0;
   }
 
   .swiper-slide img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    object-position: center top;
     display: block;
+    pointer-events: none;
   }
 
+  /* ドット：画像エリアの下端より少し上 */
   .swiper-dots {
     position: absolute;
-    bottom: 46%;
+    bottom: 38%;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
-    gap: 5px;
+    gap: 6px;
     z-index: 20;
     pointer-events: none;
   }
@@ -424,20 +430,20 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: rgba(255,255,255,0.4);
+    background: rgba(255,255,255,0.45);
     transition: all 0.25s;
   }
   .swiper-dot.active {
     background: white;
-    width: 18px;
+    width: 20px;
     border-radius: 3px;
   }
 
   .swiper-count {
     position: absolute;
-    top: 20px;
-    right: 16px;
-    background: rgba(0,0,0,0.6);
+    top: 16px;
+    right: 12px;
+    background: rgba(0,0,0,0.65);
     color: white;
     font-size: 12px;
     font-weight: 700;
@@ -539,6 +545,11 @@
 <header>
   <h1>AV</h1>
   <input type="text" id="actress-input" placeholder="女優名で検索...">
+  <select id="sort-select">
+    <option value="rank">人気順</option>
+    <option value="date">新着順</option>
+    <option value="review">評価順</option>
+  </select>
   <button id="setup-btn" onclick="openSetup()">⚙ 設定</button>
 </header>
 
@@ -605,7 +616,6 @@
 // ═══════════════════════════════════════════
 let proxyUrl    = localStorage.getItem('fanza_av_proxy_url')    || 'https://script.google.com/macros/s/AKfycbxx-r7ZoRO0YxS-v0FAlroe4BR6M-Fn6jWqxKfBk0WAA9sdRkRTYviDhwT9Vn59vQ_N/exec';
 let affiliateId = localStorage.getItem('fanza_av_affiliate_id') || 'gotomask-990';
-
 let allItems = [], currentItems = [];
 
 // ─── モーダル ───
@@ -620,7 +630,6 @@ function closeSetup() {
 document.getElementById('setup-modal').addEventListener('click', e => {
   if (e.target === document.getElementById('setup-modal')) closeSetup();
 });
-
 async function saveAndFetch() {
   proxyUrl    = document.getElementById('input-proxy-url').value.trim();
   affiliateId = document.getElementById('input-affiliate-id').value.trim();
@@ -631,20 +640,23 @@ async function saveAndFetch() {
   await fetchFromGAS();
 }
 
+// 並び替えセレクト
+document.getElementById('sort-select').addEventListener('change', () => {
+  if (proxyUrl) fetchFromGAS();
+});
+
 // ═══════════════════════════════════════════
-// FANZA API（GAS経由）
-// AV用: service=digital, floor=videoa
+// FANZA API（GAS経由）AV用
 // ═══════════════════════════════════════════
-async function fetchFromGAS(params = {}) {
+async function fetchFromGAS() {
   showLoading(true);
+  const sort = document.getElementById('sort-select').value;
   const q = new URLSearchParams({
-    hits:    params.hits    || '20',
-    sort:    params.sort    || 'rank',
-    keyword: params.keyword || '',
-    floor:   'videoa',   // ← AV用
+    hits:    '100',       // ← 最大100件
+    sort:    sort,
+    floor:   'videoa',
     service: 'digital',
   });
-  [...q.entries()].forEach(([k,v]) => { if (!v) q.delete(k); });
 
   try {
     const res  = await fetch(`${proxyUrl}?${q.toString()}`);
@@ -653,7 +665,7 @@ async function fetchFromGAS(params = {}) {
     if (json.error) throw new Error(json.error);
 
     const items = json?.result?.items ?? [];
-    if (!items.length) { showToast('作品が見つかりませんでした'); return; }
+    if (!items.length) { showToast('作品が見つかりませんでした'); showLoading(false); return; }
 
     allItems = items.map(item => ({
       id:           item.content_id,
@@ -661,9 +673,12 @@ async function fetchFromGAS(params = {}) {
       maker:        item.iteminfo?.maker?.[0]?.name ?? '',
       actress:      item.iteminfo?.actress?.map(a => a.name).join('・') ?? '',
       thumb:        item.imageURL?.large ?? item.imageURL?.list ?? '',
-      samples:      item.sampleImageURL?.sample_s?.image ?? [],
-      affiliateUrl: item.affiliateURL,
+      samples:      item.sampleImageURL?.sample_l?.image ?? item.sampleImageURL?.sample_s?.image ?? [],
+      // スマホ用FANZA URLを生成
+      affiliateUrl: buildSpUrl(item.URL),
       price:        parseInt(item.prices?.price ?? '0'),
+      // ジャンルを全部保持（配列）
+      genres:       item.iteminfo?.genre?.map(g => g.name) ?? [],
       genre:        item.iteminfo?.genre?.[0]?.name ?? '',
       isNew:        withinDays(item.date, 7),
       rank:         item.rank ?? null,
@@ -681,6 +696,19 @@ async function fetchFromGAS(params = {}) {
   }
 }
 
+// スマホ用FANZAアフィリエイトURL生成
+function buildSpUrl(productUrl) {
+  if (!productUrl) return '#';
+  // PC URLをスマホ用に変換
+  const spUrl = productUrl
+    .replace('www.dmm.co.jp/digital/videoa', 'video.dmm.co.jp/av/content')
+    .replace('/=/cid=', '/?id=');
+  if (affiliateId) {
+    return `https://al.dmm.co.jp/?lurl=${encodeURIComponent(spUrl)}&af_id=${encodeURIComponent(affiliateId)}&ch=api`;
+  }
+  return spUrl;
+}
+
 function withinDays(dateStr, days) {
   if (!dateStr) return false;
   return Date.now() - new Date(dateStr).getTime() < days * 86400000;
@@ -690,25 +718,27 @@ function withinDays(dateStr, days) {
 // デモデータ
 // ═══════════════════════════════════════════
 function loadDemo() {
-  const genres   = ['素人','人妻','熟女','巨乳','ギャル','OL','メイド','NTR','中出し','3P'];
-  const makers   = ['MOODYZ','S1','Madonna','PRESTIGE','WANZ FACTORY','Attackers'];
+  const genreList = ['素人','人妻','熟女','巨乳','ギャル','OL','メイド','NTR','中出し','3P'];
+  const makers    = ['MOODYZ','S1 NO.1 STYLE','Madonna','PRESTIGE','WANZ FACTORY','Attackers'];
   const actresses = ['架空 花子','仮想 美咲','デモ 桜','サンプル 愛','テスト 結衣','例示 麻衣'];
 
   allItems = Array.from({length: 20}, (_,i) => {
-    const base = 'https://www.dmm.co.jp/digital/videoa/';
+    const base   = 'https://video.dmm.co.jp/av/content/?id=demo';
     const affUrl = affiliateId
-      ? `https://al.dmm.co.jp/?lurl=${encodeURIComponent(base)}&af_id=${encodeURIComponent(affiliateId)}&ch=api`
-      : base;
+      ? `https://al.dmm.co.jp/?lurl=${encodeURIComponent(base+i)}&af_id=${encodeURIComponent(affiliateId)}&ch=api`
+      : base + i;
+    const g = genreList[i % genreList.length];
     return {
       id:           i,
-      title:        `【${genres[i%genres.length]}】デモ作品タイトル Vol.${i+1}`,
-      maker:        makers[i%makers.length],
-      actress:      actresses[i%actresses.length],
+      title:        `【${g}】デモ作品タイトル Vol.${i+1}`,
+      maker:        makers[i % makers.length],
+      actress:      actresses[i % actresses.length],
       thumb:        `https://picsum.photos/id/${320+i}/720/1280`,
-      samples:      Array.from({length:5},(_,s)=>`https://picsum.photos/id/${400+i*5+s}/400/560`),
+      samples:      Array.from({length:5}, (_,s) => `https://picsum.photos/id/${400+i*5+s}/720/1280`),
       affiliateUrl: affUrl,
       price:        i%6===0 ? 0 : 2178+(i%8)*220,
-      genre:        genres[i%genres.length],
+      genres:       [g],
+      genre:        g,
       isNew:        i<4,
       rank:         i<3 ? i+1 : null,
       likes:        2400+i*180,
@@ -719,7 +749,7 @@ function loadDemo() {
 }
 
 // ═══════════════════════════════════════════
-// 描画
+// 描画（TikTokスワイパー）
 // ═══════════════════════════════════════════
 function renderFeed(items) {
   currentItems = items;
@@ -736,16 +766,16 @@ function renderFeed(items) {
     const priceStr = isFree ? '無料' : `¥${item.price.toLocaleString()}`;
     const hasLink  = !!(affiliateId || proxyUrl);
 
-    const el = document.createElement('div');
-    el.className = 'tiktok-item';
-    el.dataset.index = idx;
-
-    // 表紙＋サンプル画像を結合
+    // 表紙＋サンプル全画像
     const allImgs = [item.thumb, ...(item.samples || [])].filter(Boolean);
     const total   = allImgs.length;
 
+    const el = document.createElement('div');
+    el.className    = 'tiktok-item';
+    el.dataset.index = idx;
+
     el.innerHTML = `
-      <!-- スワイパー -->
+      <!-- スワイパー：表紙+サンプルをフルスクリーンで横スワイプ -->
       <div class="swiper" id="swiper-${idx}">
         ${allImgs.map((src, si) => `
           <div class="swiper-slide">
@@ -798,9 +828,45 @@ function renderFeed(items) {
   });
 
   renderDots(items.length, 0);
+  initSwipers();
   observeItems();
 }
 
+// ─── スワイパー初期化 ───
+function initSwipers() {
+  document.querySelectorAll('.swiper').forEach(swiper => {
+    const idx    = swiper.id.replace('swiper-', '');
+    const dots   = document.getElementById(`dots-${idx}`);
+    const count  = document.getElementById(`count-${idx}`);
+    const dotEls = dots ? dots.querySelectorAll('.swiper-dot') : [];
+    const total  = dotEls.length;
+    if (total === 0) return;
+
+    // スクロールでドット更新
+    swiper.addEventListener('scroll', () => {
+      const i = Math.round(swiper.scrollLeft / swiper.offsetWidth);
+      dotEls.forEach((d, di) => d.classList.toggle('active', di === i));
+      if (count) count.textContent = `${i+1} / ${total}`;
+    }, { passive: true });
+
+    // タッチで横スワイプを確実に動かす
+    let startX = 0, startY = 0, isHoriz = null;
+    swiper.addEventListener('touchstart', e => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      isHoriz = null;
+    }, { passive: true });
+
+    swiper.addEventListener('touchmove', e => {
+      const dx = Math.abs(e.touches[0].clientX - startX);
+      const dy = Math.abs(e.touches[0].clientY - startY);
+      if (isHoriz === null) isHoriz = dx > dy;
+      if (isHoriz) e.stopPropagation(); // 縦スクロールに伝播させない
+    }, { passive: true });
+  });
+}
+
+// ─── 縦スクロール進捗ドット ───
 function renderDots(total, active) {
   const c = document.getElementById('progress-dots');
   c.innerHTML = '';
@@ -811,7 +877,6 @@ function renderDots(total, active) {
     c.appendChild(d);
   }
 }
-
 function updateDot(index) {
   const dots = document.querySelectorAll('.dot');
   const di = Math.round(index / Math.max(currentItems.length-1,1) * (dots.length-1));
@@ -828,21 +893,6 @@ function observeItems() {
     });
   }, { threshold: 0.6 });
   document.querySelectorAll('.tiktok-item').forEach(el => observer.observe(el));
-
-  // スワイパー初期化
-  document.querySelectorAll('.swiper').forEach(swiper => {
-    const idx    = swiper.id.replace('swiper-', '');
-    const dots   = document.getElementById(`dots-${idx}`);
-    const count  = document.getElementById(`count-${idx}`);
-    const dotEls = dots ? dots.querySelectorAll('.swiper-dot') : [];
-    const total  = dotEls.length;
-    if (total === 0) return;
-    swiper.addEventListener('scroll', () => {
-      const i = Math.round(swiper.scrollLeft / swiper.offsetWidth);
-      dotEls.forEach((d, di) => d.classList.toggle('active', di === i));
-      if (count) count.textContent = `${i+1} / ${total}`;
-    }, { passive: true });
-  });
 }
 
 // ═══════════════════════════════════════════
@@ -855,30 +905,19 @@ function handleLike(el) {
   el.style.transform = 'scale(1.4)';
   setTimeout(() => { el.style.transform=''; icon.textContent='❤️'; }, 300);
 }
-
 function handleBookmark(el) {
   const icon=el.querySelector('.icon'), lbl=el.querySelector('.lbl');
   icon.textContent='✅'; lbl.textContent='保存済';
   setTimeout(() => { icon.textContent='🔖'; lbl.textContent='保存'; }, 1800);
 }
-
 function handleShare(url) {
   if (navigator.share) { navigator.share({ title:'FANZAアーカイブ', url }); }
   else if (navigator.clipboard) { navigator.clipboard.writeText(url); showToast('📋 リンクをコピーしました！'); }
   else { prompt('URLをコピーしてください:', url); }
 }
 
-function openViewer(src) {
-  document.getElementById('img-viewer-img').src = src;
-  document.getElementById('img-viewer').classList.add('open');
-}
-function closeViewer() {
-  document.getElementById('img-viewer').classList.remove('open');
-  document.getElementById('img-viewer-img').src = '';
-}
-
 // ═══════════════════════════════════════════
-// フィルター（女優名 + ジャンル）
+// フィルター（女優名・ジャンル・全ジャンル対応）
 // ═══════════════════════════════════════════
 document.getElementById('actress-input').addEventListener('input', filterItems);
 document.querySelectorAll('.filter-btn').forEach(btn => {
@@ -892,35 +931,36 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 function filterItems() {
   const text  = document.getElementById('actress-input').value.toLowerCase().trim();
   const genre = document.querySelector('.filter-btn.active').dataset.genre;
-  renderFeed(allItems.filter(item =>
-    (!text || item.title.toLowerCase().includes(text) ||
-              item.actress.toLowerCase().includes(text) ||
-              item.maker.toLowerCase().includes(text)) &&
-    (genre==='all' || (item.genre && item.genre.includes(genre)))
-  ));
+  renderFeed(allItems.filter(item => {
+    const matchText  = !text ||
+      item.title.toLowerCase().includes(text) ||
+      item.actress.toLowerCase().includes(text) ||
+      item.maker.toLowerCase().includes(text);
+    // genres配列で全ジャンルに対して部分一致チェック
+    const matchGenre = genre === 'all' ||
+      (item.genres && item.genres.some(g => g.includes(genre)));
+    return matchText && matchGenre;
+  }));
 }
 
 // ═══════════════════════════════════════════
 // ユーティリティ
 // ═══════════════════════════════════════════
 function showLoading(f) { document.getElementById('loading').classList.toggle('show',f); }
-
 function showToast(msg) {
   const t = document.createElement('div');
   t.textContent = msg;
   Object.assign(t.style, {
     position:'fixed', bottom:'80px', left:'50%', transform:'translateX(-50%)',
-    background:'rgba(192,57,43,0.92)', color:'white',
+    background:'rgba(192,57,43,0.95)', color:'white',
     padding:'10px 22px', borderRadius:'2px',
     fontSize:'13px', fontWeight:'700', zIndex:'200',
     pointerEvents:'none', whiteSpace:'nowrap', transition:'opacity 0.4s',
-    letterSpacing:'1px',
   });
   document.body.appendChild(t);
   setTimeout(() => t.style.opacity='0', 1800);
   setTimeout(() => t.remove(), 2200);
 }
-
 function esc(s) {
   return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
