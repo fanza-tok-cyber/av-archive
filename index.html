@@ -242,7 +242,7 @@
     scroll-snap-align: start;
     position: relative;
     background: #050303;
-    overflow: hidden;  /* hiddenに戻す */
+    overflow: hidden;
   }
 
   .overlay {
@@ -384,34 +384,40 @@
   .swiper {
     position: absolute;
     inset: 0;
+    width: 100%;
+    height: 100%;
     display: flex;
     overflow-x: scroll;
     overflow-y: hidden;
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    /* タッチ操作：縦スクロールと横スワイプを両立 */
-    touch-action: pan-y pinch-zoom;
+    touch-action: pan-x;
+    z-index: 0;
+    gap: 0;
   }
   .swiper::-webkit-scrollbar { display: none; }
 
   .swiper-slide {
     flex: 0 0 100%;
-    width: 100%;
+    min-width: 100%;
     height: 100%;
     scroll-snap-align: start;
     position: relative;
     overflow: hidden;
-    flex-shrink: 0;
+    background: #050303;
   }
 
   .swiper-slide img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    object-position: center top;
+    object-position: center center;
     display: block;
     pointer-events: none;
+    -webkit-user-drag: none;
+    position: absolute;
+    inset: 0;
   }
 
   /* ドット：画像エリアの下端より少し上 */
@@ -766,8 +772,10 @@ function renderFeed(items) {
     const priceStr = isFree ? '無料' : `¥${item.price.toLocaleString()}`;
     const hasLink  = !!(affiliateId || proxyUrl);
 
-    // 表紙＋サンプル全画像
-    const allImgs = [item.thumb, ...(item.samples || [])].filter(Boolean);
+    // サンプル画像のみ（表紙は除外）。サンプルがない場合のみthumbを使う
+    const allImgs = (item.samples && item.samples.length > 0)
+      ? item.samples.filter(Boolean)
+      : [item.thumb].filter(Boolean);
     const total   = allImgs.length;
 
     const el = document.createElement('div');
@@ -840,28 +848,39 @@ function initSwipers() {
     const count  = document.getElementById(`count-${idx}`);
     const dotEls = dots ? dots.querySelectorAll('.swiper-dot') : [];
     const total  = dotEls.length;
-    if (total === 0) return;
 
-    // スクロールでドット更新
-    swiper.addEventListener('scroll', () => {
-      const i = Math.round(swiper.scrollLeft / swiper.offsetWidth);
-      dotEls.forEach((d, di) => d.classList.toggle('active', di === i));
-      if (count) count.textContent = `${i+1} / ${total}`;
-    }, { passive: true });
+    // スクロールでドット・カウンター更新
+    if (total > 0) {
+      swiper.addEventListener('scroll', () => {
+        const i = Math.round(swiper.scrollLeft / swiper.offsetWidth);
+        dotEls.forEach((d, di) => d.classList.toggle('active', di === i));
+        if (count) count.textContent = `${i+1} / ${total}`;
+      }, { passive: true });
+    }
 
-    // タッチで横スワイプを確実に動かす
-    let startX = 0, startY = 0, isHoriz = null;
+    // タッチ制御：横スワイプと縦スクロールを判定して切り替え
+    let startX = 0, startY = 0, decided = false, isHoriz = false;
+
     swiper.addEventListener('touchstart', e => {
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-      isHoriz = null;
+      startX  = e.touches[0].clientX;
+      startY  = e.touches[0].clientY;
+      decided = false;
+      isHoriz = false;
     }, { passive: true });
 
     swiper.addEventListener('touchmove', e => {
-      const dx = Math.abs(e.touches[0].clientX - startX);
-      const dy = Math.abs(e.touches[0].clientY - startY);
-      if (isHoriz === null) isHoriz = dx > dy;
-      if (isHoriz) e.stopPropagation(); // 縦スクロールに伝播させない
+      if (!decided) {
+        const dx = Math.abs(e.touches[0].clientX - startX);
+        const dy = Math.abs(e.touches[0].clientY - startY);
+        if (dx > 8 || dy > 8) {
+          decided = true;
+          isHoriz = dx >= dy;
+        }
+      }
+      // 横スワイプと判定したらfeed（縦）へのイベント伝播を止める
+      if (isHoriz) {
+        e.stopPropagation();
+      }
     }, { passive: true });
   });
 }
